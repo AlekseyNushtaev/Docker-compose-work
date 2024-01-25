@@ -1,0 +1,51 @@
+version: '3.9'
+
+services:
+
+  db:
+    image: postgres:alpine
+    environment:
+      - POSTGRES_DB=stocks_products
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - PGDATA=/var/lib/pgsql/data/pgdata
+    volumes:
+      - ./data:/var/lib/postgresql/data:Z
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./code
+    command: bash -c "python manage.py makemigrations && python manage.py migrate &&
+            python manage.py collectstatic --noinput && gunicorn stocks_products.wsgi:application --bind 0.0.0.0:8001"
+    volumes:
+      - ./code:/code
+    environment:
+      - POSTGRES_DB=stocks_products
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    depends_on:
+      db:
+        condition: service_healthy
+    links:
+      - db
+    ports:
+      - 8001:8001
+
+  nginx:
+    build: ./nginx
+    volumes:
+      - ./code/static:/stocks_products/static
+    ports:
+      - 80:80
+    links:
+      - web
+    depends_on:
+      - web
+
+
+
+
